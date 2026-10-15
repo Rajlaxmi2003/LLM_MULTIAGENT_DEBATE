@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LLM Multi-Agent Debate</title>
+    <meta
+      name="description"
+      content="Professional multi-agent debate demo for evaluating arithmetic reasoning with LLM agents."
+    />
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <div class="glow glow-one"></div>
+      <div class="glow glow-two"></div>
+
+      <div class="container">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">AI reasoning studio</p>
+            <h1>Multi-Agent Debate</h1>
+          </div>
+          <button id="randomize-btn" class="secondary-btn" type="button">Random equation</button>
+        </header>
+
+        <main class="layout">
+          <form id="debate-form" class="panel form-panel">
+            <div class="panel-header">
+              <div>
+                <p class="panel-kicker">Configuration</p>
+                <h2>Choose a problem</h2>
+              </div>
+              <span class="pill">Live</span>
+            </div>
+
+            <label class="question-label">
+              Custom equation or question
+              <textarea
+                name="question"
+                rows="4"
+                maxlength="4000"
+                placeholder="Optional: enter any equation or question. For example: What is 125 × 48? Or explain why the seasons change."
+              ></textarea>
+              <span class="field-hint">If entered, this replaces the A–F arithmetic problem.</span>
+            </label>
+
+            <div class="equation-heading">
+              <span class="panel-kicker">Or use the built-in equation</span>
+              <span class="equation-preview">A + B × C + D − E × F</span>
+            </div>
+
+            <div class="grid">
+              <label>
+                A
+                <input type="number" name="a" value="12" />
+              </label>
+              <label>
+                B
+                <input type="number" name="b" value="28" />
+              </label>
+              <label>
+                C
+                <input type="number" name="c" value="19" />
+              </label>
+              <label>
+                D
+                <input type="number" name="d" value="6" />
+              </label>
+              <label>
+                E
+                <input type="number" name="e" value="4" />
+              </label>
+              <label>
+                F
+                <input type="number" name="f" value="9" />
+              </label>
+            </div>
+
+            <div class="settings">
+              <label>
+                Agents
+                <input type="number" name="agents" min="1" value="2" />
+              </label>
+              <label>
+                Rounds
+                <input type="number" name="rounds" min="1" value="3" />
+              </label>
+            </div>
+
+            <button class="primary-btn" type="submit">
+              <span class="btn-text">Run debate</span>
+            </button>
+          </form>
+
+          <section id="result" class="panel result-panel hidden" aria-live="polite">
+            <div class="panel-header">
+              <div>
+                <p class="panel-kicker">Summary</p>
+                <h2>Debate result</h2>
+              </div>
+              <button id="back-btn" class="secondary-btn" type="button">← Back to problem</button>
+            </div>
+            <div class="summary" id="summary"></div>
+            <div class="responses" id="responses"></div>
+          </section>
+        </main>
+
+        <div id="error-box" class="error hidden"></div>
+      </div>
+    </div>
+
+    <script>
+      const form = document.getElementById('debate-form');
+      const resultBox = document.getElementById('result');
+      const summaryBox = document.getElementById('summary');
+      const responsesBox = document.getElementById('responses');
+      const errorBox = document.getElementById('error-box');
+      const submitButton = form.querySelector('.primary-btn');
+      const submitText = submitButton.querySelector('.btn-text');
+      const randomizeButton = document.getElementById('randomize-btn');
+
+      function randomInt(min, max) {
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+      }
+
+      function setLoading(state) {
+        submitButton.disabled = state;
+        submitButton.classList.toggle('loading', state);
+        submitText.textContent = state ? 'Running...' : 'Run debate';
+      }
+
+      function populateRandomValues() {
+        const values = [
+          randomInt(0, 29),
+          randomInt(0, 29),
+          randomInt(0, 29),
+          randomInt(0, 29),
+          randomInt(0, 29),
+          randomInt(0, 29),
+        ];
+
+        ['a', 'b', 'c', 'd', 'e', 'f'].forEach((key, index) => {
+          form.elements[key].value = values[index];
+        });
+      }
+
+      randomizeButton.addEventListener('click', populateRandomValues);
+      document.getElementById('back-btn').addEventListener('click', () => {
+        resultBox.classList.add('hidden');
+        form.classList.remove('hidden');
+        randomizeButton.classList.remove('hidden');
+        document.querySelector('.layout').classList.remove('results-only');
+        errorBox.classList.add('hidden');
+        form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        errorBox.classList.add('hidden');
+        errorBox.textContent = '';
+        setLoading(true);
+
+        const payload = {
+          a: Number(form.elements.a.value),
+          b: Number(form.elements.b.value),
+          c: Number(form.elements.c.value),
+          d: Number(form.elements.d.value),
+          e: Number(form.elements.e.value),
+          f: Number(form.elements.f.value),
+          agents: Number(form.elements.agents.value),
+          rounds: Number(form.elements.rounds.value),
+          question: form.elements.question.value.trim(),
+        };
+
+        try {
+          const response = await fetch('/api/run', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+
+          const result = await response.json();
+
+          if (!response.ok) {
+            throw new Error(result.error || 'Request failed');
+          }
+
+          renderResult(result);
+        } catch (error) {
+          errorBox.textContent = error.message;
+          errorBox.classList.remove('hidden');
+          resultBox.classList.add('hidden');
+        } finally {
+          setLoading(false);
+        }
+      });
+
+      function renderResult(result) {
+        form.classList.add('hidden');
+        randomizeButton.classList.add('hidden');
+        document.querySelector('.layout').classList.add('results-only');
+        resultBox.classList.remove('hidden');
+        summaryBox.replaceChildren();
+        responsesBox.replaceChildren();
+
+        const summaryCard = document.createElement('div');
+        summaryCard.className = 'result-card summary-card';
+        appendDetail(summaryCard, result.is_custom ? 'Question' : 'Equation', result.equation);
+        appendDetail(summaryCard, 'Agents', result.agents);
+        appendDetail(summaryCard, 'Rounds', result.rounds);
+        if (result.is_custom) {
+          appendDetail(summaryCard, 'Debate response', result.final_answer || 'No response was returned.');
+          appendDetail(summaryCard, 'Evaluation', 'Custom questions do not have an automatic answer key.');
+        } else {
+          appendDetail(summaryCard, 'Correct answer', result.correct_answer);
+          appendDetail(summaryCard, 'Debate answer', result.final_answer ?? 'No valid answer detected');
+          appendStatus(summaryCard, result.score);
+        }
+        summaryBox.append(summaryCard);
+
+        result.responses.forEach((item) => {
+          const card = document.createElement('div');
+          card.className = 'response-card';
+          const heading = document.createElement('div');
+          heading.className = 'response-head';
+          const title = document.createElement('h3');
+          title.textContent = `Agent ${item.agent}`;
+          const parsedAnswer = document.createElement('span');
+          parsedAnswer.className = 'parsed-answer';
+          parsedAnswer.textContent = item.parsed_answer ?? 'Text response';
+          const responseText = document.createElement('p');
+          responseText.textContent = item.response;
+          heading.append(title, parsedAnswer);
+          card.append(heading, responseText);
+          responsesBox.append(card);
+        });
+
+        resultBox.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+
+      function appendDetail(parent, label, value) {
+        const row = document.createElement('p');
+        const strong = document.createElement('strong');
+        strong.textContent = `${label}: `;
+        row.append(strong, document.createTextNode(value ?? '—'));
+        parent.append(row);
+      }
+
+      function appendStatus(parent, score) {
+        const row = document.createElement('p');
+        const label = document.createElement('strong');
+        label.textContent = 'Status: ';
+        const status = document.createElement('span');
+        status.className = `state-badge ${score === 1 ? 'success' : 'warning'}`;
+        status.textContent = score === 1 ? 'Correct' : 'Incorrect';
+        row.append(label, status);
+        parent.append(row);
+      }
+    </script>
+  </body>
+</html>

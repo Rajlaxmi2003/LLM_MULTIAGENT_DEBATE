@@ -13,6 +13,18 @@ You may see some additional debate logs [here](https://www.dropbox.com/sh/6kq5ix
 
 Also, check out gauss5930's awesome implementation of multiagent debate on opensource LLMs [here](https://github.com/gauss5930/LLM-Agora)!
 
+## Running the web app
+
+To launch the browser-based version of the multi-agent debate demo:
+
+```
+python app.py
+```
+
+Then open http://localhost:5000 in your browser.
+
+Enter a custom equation or question in the custom prompt field, or leave it empty to use the built-in A–F arithmetic equation. Custom prompts show the agents' responses without an automatic correctness score. Use **Back to problem** on the results screen to edit the question or settings.
+
 ## Running experiments
 
 The code for running arithmetic, GSM, biographies, and MMLU tasks may be found in the following subfolders

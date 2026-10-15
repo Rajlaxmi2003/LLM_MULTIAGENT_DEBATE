@@ -1,4 +1,8 @@
 import openai
+
+openai.api_key = "ollama"
+openai.api_base = "http://localhost:11434/v1"
+
 import json
 import numpy as np
 import time
@@ -23,18 +27,19 @@ def parse_bullets(sentence):
     return bullets
 
 
+
 def generate_answer(answer_context):
     try:
         completion = openai.ChatCompletion.create(
-                  model="gpt-3.5-turbo-0301",
-                  messages=answer_context,
-                  n=1)
-    except:
-        print("retrying due to an error......")
-        time.sleep(20)
-        return generate_answer(answer_context)
+            model="llama3.2",
+            messages=answer_context,
+            n=1
+        )
+        return completion
+    except Exception as e:
+        print("Actual error:", repr(e))
+        raise
 
-    return completion
 
 
 def construct_message(agents, question, idx):
@@ -90,7 +95,7 @@ if __name__ == "__main__":
     rounds = 3
     np.random.seed(0)
 
-    evaluation_round = 100
+    evaluation_round = 5
     scores = []
 
     generated_description = {}
